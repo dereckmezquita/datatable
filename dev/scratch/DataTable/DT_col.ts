@@ -9,10 +9,10 @@ export class DataTable<T extends Record<string, any>> {
         this._columns = Object.keys(data[0]) as (keyof T)[];
         this._rowCount = data.length;
         this._keys = new Set();
-        this.initializeFromData(data);
+        this.initialiseFromData(data);
     }
 
-    private initializeFromData(data: T[]): void {
+    private initialiseFromData(data: T[]): void {
         for (const column of this._columns) {
             this._data[column] = data.map(row => row[column]);
         }
