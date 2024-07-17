@@ -9,6 +9,7 @@
   "bugs": {
     "url": "https://github.com/dereckmezquita/datatable/issues"
   },
+  "license": "MIT + file LICENSE",
   "author": {
     "name": "Dereck Mezquita",
     "email": "dereck@mezquita.io"
