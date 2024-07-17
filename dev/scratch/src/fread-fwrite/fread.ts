@@ -2,9 +2,13 @@ import fs from 'fs';
 import readline from 'readline';
 import { DataTable } from '../DataTable/DT_col3';
 
+// Define the basic types that can be used for type coercion
 type BasicType = 'string' | 'number' | 'boolean' | 'Date';
-type TypeCoercion<T> = BasicType | ((value: string) => T);
 
+// TypeCoercion can be either a basic type string or a custom function
+type TypeCoercion<T> = ((value: string) => T) | BasicType;
+
+// Options interface for fread functions
 interface FreadOptions<T> {
     header?: boolean;
     separator?: string;
@@ -12,6 +16,38 @@ interface FreadOptions<T> {
     skipRows?: number;
     select?: (keyof T)[];
     colClasses?: { [K in keyof T]?: TypeCoercion<T[K]> };
+}
+
+// Function to infer the type of a value
+function inferType(value: string): BasicType {
+    if (value === '') return 'string';
+    if (value === 'true' || value === 'false') return 'boolean';
+    if (!isNaN(Number(value))) return 'number';
+    if (!isNaN(Date.parse(value))) return 'Date';
+    return 'string';
+}
+
+// Function to coerce a value based on the inferred or specified type
+function coerceValue(
+    value: string,
+    type: BasicType | ((value: string) => any)
+): any {
+    if (typeof type === 'function') {
+        return type(value);
+    }
+
+    switch (type) {
+        case 'string':
+            return value;
+        case 'number':
+            return Number(value);
+        case 'boolean':
+            return value.toLowerCase() === 'true';
+        case 'Date':
+            return new Date(value);
+        default:
+            return value;
+    }
 }
 
 function processLines<T extends Record<string, any>>(
@@ -36,6 +72,15 @@ function processLines<T extends Record<string, any>>(
     const data: { [K in keyof T]?: T[K][] } = {};
     columns.forEach((col) => (data[col] = []));
 
+    // Infer column types from the first data row if colClasses is not provided
+    const inferredTypes: { [K in keyof T]?: BasicType } = {};
+    if (!colClasses) {
+        const firstDataRow = lines[0].split(separator);
+        columns.forEach((col, index) => {
+            inferredTypes[col] = inferType(firstDataRow[index]);
+        });
+    }
+
     lines.forEach((line) => {
         const values = line
             .split(separator)
@@ -43,39 +88,15 @@ function processLines<T extends Record<string, any>>(
                 v.trim().replace(new RegExp(`^${quote}|${quote}$`, 'g'), '')
             );
 
-        columns.forEach((col) => {
-            if (select && !headerRow.includes(col as string)) {
-                throw new Error(
-                    `Selected column "${String(col)}" not found in CSV`
-                );
-            }
-
-            const value = values[headerRow.indexOf(col as string)];
+        columns.forEach((col, index) => {
+            const value = values[index] || '';
 
             if (colClasses && col in colClasses) {
-                const typeCoercion = colClasses[col];
-                if (typeof typeCoercion === 'function') {
-                    data[col]!.push(typeCoercion(value));
-                } else {
-                    switch (typeCoercion) {
-                        case 'string':
-                            data[col]!.push(value as T[keyof T]);
-                            break;
-                        case 'number':
-                            data[col]!.push(Number(value) as T[keyof T]);
-                            break;
-                        case 'boolean':
-                            data[col]!.push(
-                                (value.toLowerCase() === 'true') as T[keyof T]
-                            );
-                            break;
-                        case 'Date':
-                            data[col]!.push(new Date(value) as T[keyof T]);
-                            break;
-                    }
-                }
+                data[col]!.push(coerceValue(value, colClasses[col]!));
             } else {
-                data[col]!.push(value as T[keyof T]);
+                data[col]!.push(
+                    coerceValue(value, inferredTypes[col] || 'string')
+                );
             }
         });
     });
@@ -90,28 +111,36 @@ export function freadSync<T extends Record<string, any>>(
     const { skipRows = 0 } = options;
 
     const content = fs.readFileSync(filePath, 'utf-8');
-    const lines = content
-        .split('\n')
-        .slice(skipRows)
-        .filter((line) => line.trim() !== '');
+    const lines = content.split('\n').filter((line) => line.trim() !== '');
 
-    // Validate data structure
-    const firstLineColumns = lines[0].split(options.separator || ',').length;
-    const lastLineColumns = lines[lines.length - 1].split(
-        options.separator || ','
-    ).length;
-    if (firstLineColumns !== lastLineColumns) {
-        throw new Error('Inconsistent number of columns in the data');
+    if (lines.length === 0) {
+        throw new Error('Empty file or all rows skipped');
     }
 
-    return processLines(lines, options);
+    // Get header and first data line
+    const headerRow = lines[skipRows].split(options.separator || ',');
+    const firstDataRow = lines[skipRows + (options.header ? 1 : 0)].split(
+        options.separator || ','
+    );
+
+    // Get last data line
+    const lastDataRow = lines[lines.length - 1].split(options.separator || ',');
+
+    // Check for consistency in column count
+    if (firstDataRow.length !== lastDataRow.length) {
+        console.warn(
+            'Inconsistent number of columns in the data. Some values may be filled with null.'
+        );
+    }
+
+    return processLines(lines.slice(skipRows), options);
 }
 
 export async function fread<T extends Record<string, any>>(
     filePath: string,
     options: FreadOptions<T> = {}
 ): Promise<DataTable<T>> {
-    const { skipRows = 0 } = options;
+    const { skipRows = 0, separator = ',' } = options;
 
     const fileStream = fs.createReadStream(filePath);
     const rl = readline.createInterface({
@@ -125,18 +154,22 @@ export async function fread<T extends Record<string, any>>(
     let lastLineColumns = 0;
 
     for await (const line of rl) {
-        if (lineCount >= skipRows && line.trim() !== '') {
-            lines.push(line);
+        if (line.trim() !== '') {
             if (lineCount === skipRows) {
-                firstLineColumns = line.split(options.separator || ',').length;
+                firstLineColumns = line.split(separator).length;
             }
-            lastLineColumns = line.split(options.separator || ',').length;
+            if (lineCount >= skipRows) {
+                lines.push(line);
+            }
+            lastLineColumns = line.split(separator).length;
+            lineCount++;
         }
-        lineCount++;
     }
 
     if (firstLineColumns !== lastLineColumns) {
-        throw new Error('Inconsistent number of columns in the data');
+        console.warn(
+            'Inconsistent number of columns in the data. Some values may be filled with null.'
+        );
     }
 
     return processLines(lines, options);
