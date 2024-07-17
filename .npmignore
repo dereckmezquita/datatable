@@ -1,0 +1,9 @@
+# dev
+dev/
+
+# project
+.github
+test
+.gitignore
+.npmignore
+yarn-error.log

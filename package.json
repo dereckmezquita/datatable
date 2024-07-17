@@ -2,7 +2,10 @@
   "name": "data.table",
   "version": "0.0.1",
   "main": "./dist/index.js",
-  "repository": "git@github.com:dereckmezquita/data.table.git",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dereckmezquita/data.table.git"
+  },
   "author": {
     "name": "Dereck Mezquita",
     "email": "dereck@mezquita.io"
