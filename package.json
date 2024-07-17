@@ -1,6 +1,6 @@
 {
   "name": "@dereckmezquita/datatable",
-  "version": "0.0.1",
+  "version": "0.0.32",
   "main": "./dist/index.js",
   "repository": {
     "type": "git",
@@ -9,7 +9,7 @@
   "bugs": {
     "url": "https://github.com/dereckmezquita/datatable/issues"
   },
-  "license": "MIT + file LICENSE",
+  "license": "MIT",
   "author": {
     "name": "Dereck Mezquita",
     "email": "dereck@mezquita.io"
@@ -17,8 +17,7 @@
   "scripts": {
     "clean": "rm -rf dist",
     "build": "yarn run clean && tsc",
-    "publish": "yarn run build && yarn publish",
-    "link": "yarn build && yarn link",
+    "prepublishOnly": "yarn run build",
     "format": "prettier --write .",
     "test": "jest"
   },
