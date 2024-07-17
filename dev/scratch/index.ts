@@ -1,4 +1,4 @@
-import { DataTable } from "./DataTable/DT_col";
+import { DataTable } from './DataTable/DT_col';
 
 interface Person {
     id: number;

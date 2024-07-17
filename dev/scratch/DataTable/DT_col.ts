@@ -14,23 +14,23 @@ export class DataTable<T extends Record<string, any>> {
 
     private initialiseFromData(data: T[]): void {
         for (const column of this._columns) {
-            this._data[column] = data.map(row => row[column]);
+            this._data[column] = data.map((row) => row[column]);
         }
     }
 
     public query(
         filterFn?: (row: T) => boolean,
         operations?: {
-            select?: (keyof T)[],
-            assign?: { [K in keyof T]?: (row: T, index: number) => T[K] }
+            select?: (keyof T)[];
+            assign?: { [K in keyof T]?: (row: T, index: number) => T[K] };
         },
         options?: {
-            by?: keyof T | (keyof T)[],
-            SD?: (keyof T)[]
+            by?: keyof T | (keyof T)[];
+            SD?: (keyof T)[];
         }
     ): DataTable<T> {
         // Implementation to be added
-        throw new Error("Method not implemented.");
+        throw new Error('Method not implemented.');
     }
 
     public setkey(key: keyof T | (keyof T)[]): void {
@@ -39,7 +39,7 @@ export class DataTable<T extends Record<string, any>> {
 
     public setorder(columns: (keyof T)[]): void {
         // Implementation to be added
-        throw new Error("Method not implemented.");
+        throw new Error('Method not implemented.');
     }
 
     public addRow(row: T): void {
