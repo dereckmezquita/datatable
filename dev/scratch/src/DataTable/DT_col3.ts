@@ -4,18 +4,32 @@ export class DataTable<T extends Record<string, any>> {
     private _rowCount: number;
     private _keys: Set<keyof T>;
 
-    constructor(data: T[]) {
+    constructor(data: T[] | { [K in keyof T]: T[K][] }) {
         this._data = {} as { [K in keyof T]: T[K][] };
-        this._columns = Object.keys(data[0]) as (keyof T)[];
-        this._rowCount = data.length;
+        this._columns = [];
+        this._rowCount = 0;
         this._keys = new Set();
-        this.initialiseFromData(data);
+
+        if (Array.isArray(data)) {
+            this.initialiseFromRows(data);
+        } else {
+            this.initialiseFromColumns(data);
+        }
     }
 
-    private initialiseFromData(data: T[]): void {
+    private initialiseFromRows(data: T[]): void {
+        this._columns = Object.keys(data[0]) as (keyof T)[];
+        this._rowCount = data.length;
+
         for (const column of this._columns) {
             this._data[column] = data.map((row) => row[column]);
         }
+    }
+
+    private initialiseFromColumns(data: { [K in keyof T]: T[K][] }): void {
+        this._data = data;
+        this._columns = Object.keys(data) as (keyof T)[];
+        this._rowCount = data[this._columns[0]].length;
     }
 
     public setkey(key: keyof T | (keyof T)[]): void {
@@ -139,9 +153,7 @@ export class DataTable<T extends Record<string, any>> {
             ) as Partial<{ [K in keyof R]: R[K][] }>;
         }
 
-        return new DataTable(
-            this.columnsToRows(resultColumns as { [K in keyof R]: R[K][] })
-        );
+        return new DataTable<R>(resultColumns as { [K in keyof R]: R[K][] });
     }
 
     private groupBy(
@@ -158,17 +170,5 @@ export class DataTable<T extends Record<string, any>> {
             groups[key].push(i);
         }
         return Object.values(groups);
-    }
-
-    private columnsToRows<R>(columns: { [K in keyof R]: R[K][] }): R[] {
-        const keys = Object.keys(columns) as (keyof R)[];
-        const rowCount = columns[keys[0]].length;
-        return Array.from({ length: rowCount }, (_, i) => {
-            const row = {} as R;
-            for (const key of keys) {
-                row[key] = columns[key][i];
-            }
-            return row;
-        });
     }
 }
