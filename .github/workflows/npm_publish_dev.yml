@@ -1,0 +1,22 @@
+name: Node.js Package Dev Release
+
+on:
+  push:
+    branches-ignore:
+      - 'master'
+jobs:
+  build-and-publish-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org/
+      - run: yarn install --frozen-lockfile
+      - run: yarn test
+      - run: |
+          npm version prerelease --preid=dev --no-git-tag-version
+          npm publish --tag dev
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
