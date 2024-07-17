@@ -2,5 +2,8 @@
   "name": "scratch",
   "version": "1.0.0",
   "main": "index.js",
-  "license": "MIT"
+  "license": "MIT",
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
 }
