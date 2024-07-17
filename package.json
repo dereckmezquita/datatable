@@ -1,10 +1,13 @@
 {
-  "name": "datatable",
+  "name": "@dereckmezquita/datatable",
   "version": "0.0.1",
   "main": "./dist/index.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/dereckmezquita/datatable.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dereckmezquita/datatable/issues"
   },
   "author": {
     "name": "Dereck Mezquita",
