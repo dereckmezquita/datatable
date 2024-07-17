@@ -2,7 +2,6 @@
 *.md
 
 # Ignore specific directory
-dev/
 
 # Ignore all JSON files
 *.json
