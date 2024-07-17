@@ -1,4 +1,5 @@
 import { DataTable } from './DataTable/DT_col3';
+import { fread } from './fread-fwrite/fread';
 
 interface Person {
     id: number;
@@ -24,4 +25,14 @@ const adults = DT.query<{ name: string; age: number }>(
     }
 );
 
-console.log(adults.toString());
+// console.log(adults.toString());
+
+const iris = fread('./data/iris.csv');
+
+// console.log(iris.toString());
+
+const smallIris = iris.query((row) => row.species === 'setosa', {
+    select: ['Species', 'Sepal.Length']
+});
+
+console.log(smallIris.toString());
