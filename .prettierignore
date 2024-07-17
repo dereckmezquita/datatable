@@ -1,0 +1,11 @@
+*.html
+*.md
+
+# Ignore specific directory
+dev/
+
+# Ignore all JSON files
+*.json
+
+# Ignore specific file
+src/ignore-this-file.ts
