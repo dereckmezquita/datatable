@@ -18,59 +18,54 @@ export class DataTable<T extends Record<string, any>> {
         }
     }
 
-    public query(
+    public query<R extends Partial<T>>(
         filterFn?: (row: T) => boolean,
         operations?: {
-            select?: (keyof T)[];
-            assign?: { [K in keyof T]?: (row: T, index: number) => T[K] };
+            select?: (keyof R)[];
+            assign?: { [P in keyof R]?: (row: T, index: number) => R[P] };
         },
         options?: {
             by?: keyof T | (keyof T)[];
             SD?: (keyof T)[];
         }
-    ): DataTable<T> {
-        let result: T[] = this.getRows();
+    ): DataTable<R> {
+        let result: any[] = this.getRows();
 
-        // Apply filter
         if (filterFn) {
             result = result.filter(filterFn);
         }
 
-        // Apply operations
-        if (operations) {
-            if (operations.select) {
-                result = result.map((row) => {
-                    const newRow: Partial<T> = {};
-                    for (const key of operations.select!) {
-                        newRow[key] = row[key];
-                    }
-                    return newRow as T;
-                });
-            }
-            if (operations.assign) {
-                result = result.map((row, index) => {
-                    const newRow = { ...row };
-                    Object.entries(operations.assign!).forEach(([key, fn]) => {
-                        if (fn) {
-                            newRow[key as keyof T] = fn(row, index);
-                        }
-                    });
-                    return newRow;
-                });
-            }
+        if (operations?.select) {
+            result = result.map((row) => {
+                const newRow: Partial<R> = {};
+                for (const key of operations.select!) {
+                    newRow[key] = row[key as keyof T];
+                }
+                return newRow as R;
+            });
         }
 
-        // Apply grouping
-        if (options && options.by) {
+        if (operations?.assign) {
+            result = result.map((row, index) => {
+                const newRow = { ...row } as R;
+                Object.entries(operations.assign!).forEach(([key, fn]) => {
+                    if (fn) {
+                        newRow[key as keyof R] = fn(row, index);
+                    }
+                });
+                return newRow;
+            });
+        }
+
+        if (options?.by) {
             const groupBy = Array.isArray(options.by)
                 ? options.by
                 : [options.by];
             const grouped = this.groupBy(result, groupBy);
-            // For now, we'll just return the first row of each group
             result = Object.values(grouped).map((group) => group[0]);
         }
 
-        return new DataTable(result);
+        return new DataTable(result) as DataTable<R>;
     }
 
     public setkey(key: keyof T | (keyof T)[]): void {

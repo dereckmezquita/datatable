@@ -16,9 +16,12 @@ const DT = new DataTable<Person>([
 ]);
 
 // R: DT[age >= 18, .(name, age)]
-// const adults: DataTable<Person>
-const adults = DT.query((row) => row.age >= 10 && row.age < 30, {
-    select: ['name', 'age']
-});
+// TYPE INFERRED DataTable<{ name: string; age: number; }>
+const adults = DT.query<{ name: string; age: number }>(
+    (row) => row.age >= 10 && row.age < 30,
+    {
+        select: ['name', 'age'] as const
+    }
+);
 
-console.log(adults);
+console.log(adults.toString());
