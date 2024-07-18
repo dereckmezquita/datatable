@@ -6,7 +6,8 @@ interface FwriteOptions {
     quote?: string;
     header?: boolean;
     na?: string;
-    append?: boolean;
+    append?: boolean; // TODO: revise the append option
+    chunkSize?: number;
 }
 
 function escapeValue(value: any, quote: string): string {
@@ -17,24 +18,21 @@ function escapeValue(value: any, quote: string): string {
     return stringValue;
 }
 
-function dataTableToCSV<T extends Record<string, any>>(
+function* dataTableRowGenerator<T extends Record<string, any>>(
     dataTable: DataTable<T>,
     options: FwriteOptions
-): string {
+): Generator<string, void, unknown> {
     const { separator = ',', quote = '"', header = true, na = '' } = options;
     const columns = dataTable['_columns'];
     const rows = dataTable['_rowCount'];
 
-    let csv = '';
-
-    // Write header
+    // Yield header
     if (header) {
-        csv +=
-            columns.map((col) => escapeValue(col, quote)).join(separator) +
+        yield columns.map((col) => escapeValue(col, quote)).join(separator) +
             '\n';
     }
 
-    // Write data rows
+    // Yield data rows
     for (let i = 0; i < rows; i++) {
         const row = columns.map((col) => {
             const value = dataTable['_data'][col][i];
@@ -42,10 +40,8 @@ function dataTableToCSV<T extends Record<string, any>>(
                 ? na
                 : escapeValue(value, quote);
         });
-        csv += row.join(separator) + '\n';
+        yield row.join(separator) + '\n';
     }
-
-    return csv;
 }
 
 export function fwriteSync<T extends Record<string, any>>(
@@ -53,14 +49,27 @@ export function fwriteSync<T extends Record<string, any>>(
     filePath: string,
     options: FwriteOptions = {}
 ): void {
-    const { append = false } = options;
-    const csv = dataTableToCSV(dataTable, options);
+    const { append = false, chunkSize = 1000 } = options;
+    const writeStream = append
+        ? fs.createWriteStream(filePath, { flags: 'a' })
+        : fs.createWriteStream(filePath);
 
-    if (append) {
-        fs.appendFileSync(filePath, csv);
-    } else {
-        fs.writeFileSync(filePath, csv);
+    const rowGenerator = dataTableRowGenerator(dataTable, options);
+
+    let chunk = '';
+    for (const row of rowGenerator) {
+        chunk += row;
+        if (chunk.length >= chunkSize) {
+            writeStream.write(chunk);
+            chunk = '';
+        }
     }
+
+    if (chunk) {
+        writeStream.write(chunk);
+    }
+
+    writeStream.end();
 }
 
 export async function fwrite<T extends Record<string, any>>(
@@ -68,12 +77,40 @@ export async function fwrite<T extends Record<string, any>>(
     filePath: string,
     options: FwriteOptions = {}
 ): Promise<void> {
-    const { append = false } = options;
-    const csv = dataTableToCSV(dataTable, options);
+    const { append = false, chunkSize = 1000 } = options;
+    const writeStream = append
+        ? fs.createWriteStream(filePath, { flags: 'a' })
+        : fs.createWriteStream(filePath);
 
-    if (append) {
-        await fs.promises.appendFile(filePath, csv);
-    } else {
-        await fs.promises.writeFile(filePath, csv);
+    const rowGenerator = dataTableRowGenerator(dataTable, options);
+
+    let chunk = '';
+    for (const row of rowGenerator) {
+        chunk += row;
+        if (chunk.length >= chunkSize) {
+            await new Promise<void>((resolve, reject) => {
+                writeStream.write(chunk, (error) => {
+                    if (error) reject(error);
+                    else resolve();
+                });
+            });
+            chunk = '';
+        }
     }
+
+    if (chunk) {
+        await new Promise<void>((resolve, reject) => {
+            writeStream.write(chunk, (error) => {
+                if (error) reject(error);
+                else resolve();
+            });
+        });
+    }
+
+    await new Promise<void>((resolve, reject) => {
+        writeStream.end((error: any) => {
+            if (error) reject(error);
+            else resolve();
+        });
+    });
 }
