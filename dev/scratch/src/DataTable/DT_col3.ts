@@ -88,8 +88,7 @@ export class DataTable<T extends Record<string, any>> {
         return row;
     }
 
-    // --------
-    public query<R extends Record<string, any>>(
+    public query<R extends Record<string, any> = T>(
         filterFn?: (row: T) => boolean,
         operations?: {
             select?: (keyof R)[];
@@ -109,35 +108,28 @@ export class DataTable<T extends Record<string, any>> {
             indices = indices.filter((i) => filterFn(this.getRow(i)));
         }
 
-        let resultColumns: { [K in keyof R]: R[K][] } = {} as {
-            [K in keyof R]: R[K][];
-        };
-
-        // Handle select operation
-        if (operations?.select) {
-            for (const key of operations.select) {
-                resultColumns[key] = indices.map(
-                    (i) =>
-                        this._data[key as keyof T][i] as unknown as R[keyof R]
-                );
-            }
-        } else {
-            for (const key of this._columns) {
-                resultColumns[key as keyof R] = indices.map(
-                    (i) => this._data[key][i] as unknown as R[keyof R]
-                );
-            }
-        }
-
-        // Handle assign operation
+        // Handle assign operation (in-place modification)
         if (operations?.assign) {
             for (const [key, fn] of Object.entries(operations.assign)) {
                 if (fn) {
-                    resultColumns[key as keyof R] = indices.map((i) =>
-                        fn(this.getRow(i), i)
-                    );
+                    const newColumn = indices.map((i) => fn(this.getRow(i), i));
+                    (this._data as any)[key] = newColumn;
+                    if (!this._columns.includes(key as keyof T)) {
+                        (this._columns as any).push(key);
+                    }
                 }
             }
+        }
+
+        // Handle select operation
+        if (operations?.select) {
+            const selectedData: Partial<{ [K in keyof R]: R[K][] }> = {};
+            for (const key of operations.select) {
+                selectedData[key] = indices.map(
+                    (i) => (this._data as any)[key][i]
+                );
+            }
+            return new DataTable(selectedData as { [K in keyof R]: R[K][] });
         }
 
         // Handle grouping
@@ -146,19 +138,23 @@ export class DataTable<T extends Record<string, any>> {
                 ? options.by
                 : [options.by];
             const grouped = this.groupBy(
-                resultColumns as unknown as { [K in keyof T]: T[K][] },
+                this._data,
                 groupBy as (keyof T)[],
                 indices
             );
-            resultColumns = Object.fromEntries(
-                Object.entries(resultColumns).map(([key, values]) => [
-                    key,
-                    grouped.map((g) => (values as any[])[g[0]])
-                ])
-            ) as { [K in keyof R]: R[K][] };
+            const resultColumns: { [K in keyof R]: R[K][] } = {} as {
+                [K in keyof R]: R[K][];
+            };
+            for (const key of this._columns) {
+                resultColumns[key as keyof R] = grouped.map(
+                    (g) => (this._data as any)[key][g[0]]
+                ) as R[keyof R][];
+            }
+            return new DataTable<R>(resultColumns);
         }
 
-        return new DataTable<R>(resultColumns);
+        // If no select or grouping, return this (possibly modified) instance
+        return this as unknown as DataTable<R>;
     }
 
     private groupBy(
@@ -168,11 +164,11 @@ export class DataTable<T extends Record<string, any>> {
     ): number[][] {
         const groups: { [key: string]: number[] } = {};
         for (let i = 0; i < indices.length; i++) {
-            const key = keys.map((k) => columns[k][i]).join('|');
+            const key = keys.map((k) => columns[k][indices[i]]).join('|');
             if (!groups[key]) {
                 groups[key] = [];
             }
-            groups[key].push(i);
+            groups[key].push(indices[i]);
         }
         return Object.values(groups);
     }

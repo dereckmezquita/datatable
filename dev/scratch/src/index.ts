@@ -32,12 +32,20 @@ const adults = DT.query<{ name: string; age: number }>(
 //      ageGroup = ifelse(age < 30, "Young", "Senior"),
 //      description = paste(name, "is", age, "years old")
 //    )]
-DT.query(undefined, {
-    assign: {
-        ageGroup: (row) => (row.age < 30 ? 'Young' : 'Senior'),
-        description: (row) => `${row.name} is ${row.age} years old`
+const DT2 = DT.query<Person & { ageGroup: string; description: string }>(
+    undefined,
+    {
+        assign: {
+            ageGroup: (row) => (row.age < 30 ? 'Young' : 'Senior'),
+            description: (row) => `${row.name} is ${row.age} years old`
+        }
     }
-});
+);
+
+// ERROR HERE: Property 'ageGroup' does not exist on type 'Person'.ts(2339)
+DT2.query((row) => row.ageGroup === 'Young');
+
+// console.log(DT.toString());
 
 const iris = freadSync('./data/iris.csv', {
     colClasses: {
@@ -49,12 +57,12 @@ const iris = freadSync('./data/iris.csv', {
     }
 });
 
-console.log(iris);
+// console.log(iris);
 
 const smallIris = iris.query((row) => row.Species === 'setosa', {
     select: ['Species', 'Sepal.Width', 'Petal.Length'] as const
 });
-console.log(smallIris.toString());
+// console.log(smallIris.toString());
 
 fwriteSync(smallIris, './output/output.csv', {
     separator: ',',
