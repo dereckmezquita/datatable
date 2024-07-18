@@ -89,7 +89,7 @@ export class DataTable<T extends Record<string, any>> {
     }
 
     // --------
-    public query<R extends Partial<T>>(
+    public query<R extends Record<string, any>>(
         filterFn?: (row: T) => boolean,
         operations?: {
             select?: (keyof R)[];
@@ -109,8 +109,11 @@ export class DataTable<T extends Record<string, any>> {
             indices = indices.filter((i) => filterFn(this.getRow(i)));
         }
 
-        let resultColumns: Partial<{ [K in keyof R]: R[K][] }> = {};
+        let resultColumns: { [K in keyof R]: R[K][] } = {} as {
+            [K in keyof R]: R[K][];
+        };
 
+        // Handle select operation
         if (operations?.select) {
             for (const key of operations.select) {
                 resultColumns[key] = indices.map(
@@ -126,6 +129,7 @@ export class DataTable<T extends Record<string, any>> {
             }
         }
 
+        // Handle assign operation
         if (operations?.assign) {
             for (const [key, fn] of Object.entries(operations.assign)) {
                 if (fn) {
@@ -136,6 +140,7 @@ export class DataTable<T extends Record<string, any>> {
             }
         }
 
+        // Handle grouping
         if (options?.by) {
             const groupBy = Array.isArray(options.by)
                 ? options.by
@@ -150,10 +155,10 @@ export class DataTable<T extends Record<string, any>> {
                     key,
                     grouped.map((g) => (values as any[])[g[0]])
                 ])
-            ) as Partial<{ [K in keyof R]: R[K][] }>;
+            ) as { [K in keyof R]: R[K][] };
         }
 
-        return new DataTable<R>(resultColumns as { [K in keyof R]: R[K][] });
+        return new DataTable<R>(resultColumns);
     }
 
     private groupBy(
