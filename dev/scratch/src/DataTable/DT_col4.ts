@@ -71,9 +71,7 @@ export class DataTable<T extends Record<string, any>> {
     }
 
     private getRows(): T[] {
-        // first create an array of row objects
         return Array.from({ length: this._rowCount }, (_, i) => {
-            // for each row, create an object with column names as keys
             const row = {} as T;
             for (const column of this._columns) {
                 row[column] = this._data[column][i];
@@ -90,31 +88,37 @@ export class DataTable<T extends Record<string, any>> {
         return row;
     }
 
-    public query<R extends Record<string, any> = T>(
-        filterFn?: (row: T) => boolean,
+    public query<R extends Record<string, any> = {}>(
+        filterFn?: (row: T & Partial<R>) => boolean,
         operations?: {
-            select?: (keyof R)[];
-            assign?: { [P in keyof R]?: (row: T, index: number) => R[P] };
+            select?: (keyof (T & R))[];
+            assign?: {
+                [P in keyof R]?: (row: T & Partial<R>, index: number) => R[P];
+            };
         },
         options?: {
-            by?: keyof T | (keyof T)[];
-            SD?: (keyof T)[];
+            by?: keyof (T & R) | (keyof (T & R))[];
+            SD?: (keyof (T & R))[];
         }
-    ): DataTable<R> {
+    ): DataTable<T & R> {
         let indices: number[] = Array.from(
             { length: this._rowCount },
             (_, i) => i
         );
 
         if (filterFn) {
-            indices = indices.filter((i) => filterFn(this.getRow(i)));
+            indices = indices.filter((i) =>
+                filterFn(this.getRow(i) as T & Partial<R>)
+            );
         }
 
         // Handle assign operation (in-place modification)
         if (operations?.assign) {
             for (const [key, fn] of Object.entries(operations.assign)) {
                 if (fn) {
-                    const newColumn = indices.map((i) => fn(this.getRow(i), i));
+                    const newColumn = indices.map((i) =>
+                        fn(this.getRow(i) as T & Partial<R>, i)
+                    );
                     (this._data as any)[key] = newColumn;
                     if (!this._columns.includes(key as keyof T)) {
                         (this._columns as any).push(key);
@@ -125,13 +129,17 @@ export class DataTable<T extends Record<string, any>> {
 
         // Handle select operation
         if (operations?.select) {
-            const selectedData: Partial<{ [K in keyof R]: R[K][] }> = {};
+            const selectedData: Partial<{
+                [K in keyof (T & R)]: (T & R)[K][];
+            }> = {};
             for (const key of operations.select) {
                 selectedData[key] = indices.map(
                     (i) => (this._data as any)[key][i]
                 );
             }
-            return new DataTable(selectedData as { [K in keyof R]: R[K][] });
+            return new DataTable(
+                selectedData as { [K in keyof (T & R)]: (T & R)[K][] }
+            );
         }
 
         // Handle grouping
@@ -140,28 +148,29 @@ export class DataTable<T extends Record<string, any>> {
                 ? options.by
                 : [options.by];
             const grouped = this.groupBy(
-                this._data,
-                groupBy as (keyof T)[],
+                this._data as { [K in keyof (T & R)]: (T & R)[K][] },
+                groupBy as (keyof (T & R))[],
                 indices
             );
-            const resultColumns: { [K in keyof R]: R[K][] } = {} as {
-                [K in keyof R]: R[K][];
-            };
+            const resultColumns: { [K in keyof (T & R)]: (T & R)[K][] } =
+                {} as {
+                    [K in keyof (T & R)]: (T & R)[K][];
+                };
             for (const key of this._columns) {
-                resultColumns[key as keyof R] = grouped.map(
+                resultColumns[key as keyof (T & R)] = grouped.map(
                     (g) => (this._data as any)[key][g[0]]
-                ) as R[keyof R][];
+                );
             }
-            return new DataTable<R>(resultColumns);
+            return new DataTable<T & R>(resultColumns);
         }
 
         // If no select or grouping, return this (possibly modified) instance
-        return this as unknown as DataTable<R>;
+        return this as unknown as DataTable<T & R>;
     }
 
-    private groupBy(
+    private groupBy<K extends keyof T>(
         columns: { [K in keyof T]: T[K][] },
-        keys: (keyof T)[],
+        keys: K[],
         indices: number[]
     ): number[][] {
         const groups: { [key: string]: number[] } = {};
